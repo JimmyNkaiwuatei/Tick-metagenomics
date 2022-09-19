@@ -71,3 +71,69 @@ https://github.com/chanzuckerberg/idseq-workflows
 https://github.com/chanzuckerberg/idseq-workflows
 ## VirldAl- viral sequences search tool:
  https://github.com/budkina/VirIdAl.
+
+# Sequence retrieval and filtration
+The raw reads from tick pools tested will be easily retrieved from https://idseq.net/ under the project name “KWS ticks” and in National Center for Biotechnology Information (NCBI) biosample database with the ID: SUB11147880.
+
+## Generating host removal databases
+The process for generating host removal databases is as follows.
+
+[Build the STAR database:](https://github.com/chanzuckerberg/idseq-dag/blob/master/idseq_dag/steps/generate_host_genome.py)
+
+STAR
+--runThreadN {cpu_count}
+--runMode genomeGenerate
+--sjdbGTFfile {gtf_command_part}*  *
+--genomeDir {star_genome_part_dir}
+--genomeFastaFiles {fasta_file_list[i]}* *
+
+note: the --sjdbGTFfile option and .gtf file is only used for database generation in cases where this file is available.
+
+ERCCs in the STAR database: The External RNA Control Consortium (ERCC) developed a set of spike-in controls that can be used to measure sensitivity, accuracy, and biases in RNA-seq experiments as well as to derive standard curves for quantifying the abundance of transcripts (manuscript available [here](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3166838/)). Quantification of ERCCs is done in the first host removal pipeline step, using STAR. The ERCC reference sequences are appended to the host reference .fasta file and a .gtf file is used to enable quantification of ERCC abundance via the built-in STAR gene-count capabilities.
+
+[Build the Bowtie2 database:](https://github.com/chanzuckerberg/idseq-dag/blob/master/idseq_dag/steps/generate_host_genome.py)
+
+bowtie2-build {fasta_file} {host_name}
+
+Build the GSNAP database for final human removal: This was generated one-time only, using the following command:
+
+# gsnap version 2017-08-25
+gmap_build 
+-d hg38_pantro5_k16 
+-D ./gsnap 
+-k 16 
+hg38_pantro5.fa
+
+Pipeline Input
+
+[RunValidateInput](https://github.com/chanzuckerberg/idseq-dag/blob/master/idseq_dag/steps/run_validate_input.py)
+
+Input: raw .fastq files
+
+Process: Validates that the input files are .fastq format and truncates to 75 million fragments (specifically, 75 million reads for single-end libraries or 150 million reads for paired-end libraries). The validation process counts the number of sequences that fall in specified length buckets, which will inform the parameters used downstream for initial host removal by STAR.
+
+Output:
+
+    validate_input1.fastq
+    validate_input2.fastq
+    validate_input_summary.json: {"<50": 0, "50-500": 93621550, "500-10000": 0, "10000+": 0}
+    
+## Build the star database
+    STAR
+--runThreadN {cpu_count}
+--runMode genomeGenerate
+--sjdbGTFfile {gtf_command_part}* *
+--genomeDir {star_genome_part_dir}
+--genomeFastaFiles {fasta_file_list[i]}* *
+
+## Build Bowtie2 database
+Bowtie2-build {fasta_file} {host_name}
+
+Build the GSNAP database for final human removal: This will be generated one-time only, using the following command:
+gsnap version 2017-08-25
+
+gmap_build
+-d hg38_pantro5_k16
+-D ./gsnap
+-k 16
+hg38_pantro5.fa
